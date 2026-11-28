@@ -1,0 +1,105 @@
+name: Build AtaVision 81 (HTML + APK + Windows)
+
+on:
+  push:
+    tags:
+      - "v81.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  html:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify HTML
+        run: |
+          ls -lh web/
+          sha256sum web/AtaVision-81.0.0.0-Offline.html | tee SHA256SUMS-81.0.0.0
+          grep -q "81.0.0.0" web/AtaVision-81.0.0.0-Offline.html && echo "version OK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: html-81
+          path: |
+            web/AtaVision-81.0.0.0-Offline.html
+            web/version.json
+            SHA256SUMS-81.0.0.0
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Copy HTML into assets
+        run: cp web/AtaVision-81.0.0.0-Offline.html android/app/src/main/assets/index.html
+      - name: Build release APK (debug-signed in CI)
+        working-directory: android
+        run: gradle assembleRelease --no-daemon
+      - name: Rename APK
+        run: |
+          find android -name "*.apk" -exec ls -lh {} \;
+          cp android/app/build/outputs/apk/release/app-release.apk AtaVision-81.0.0.0-Android.apk
+          sha256sum AtaVision-81.0.0.0-Android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-81
+          path: AtaVision-81.0.0.0-Android.apk
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Publish portable x64
+        run: dotnet publish windows/AtaVision.Windows/AtaVision.Windows.csproj -c Release -r win-x64 --self-contained false -o windows/publish
+      - name: Package portable EXE
+        run: |
+          Copy-Item windows/publish/AtaVision.exe AtaVision-81.0.0.0-Windows-Portable-x64.exe
+          Get-FileHash AtaVision-81.0.0.0-Windows-Portable-x64.exe -Algorithm SHA256
+      - name: Build installer (Inno Setup)
+        run: |
+          choco install innosetup --yes --no-progress
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" windows/AtaVision.Windows/installer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-81
+          path: |
+            AtaVision-81.0.0.0-Windows-Portable-x64.exe
+            Output/*.exe
+
+  release:
+    needs: [html, android, windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Collect + hash
+        run: |
+          find dist -type f | sort
+          find dist -type f -exec sha256sum {} \; | tee SHA256SUMS-81.0.0.0
+          cat SHA256SUMS-81.0.0.0
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/**/*.html
+            dist/**/*.apk
+            dist/**/*.exe
+            SHA256SUMS-81.0.0.0
+          body: |
+            ## AtaVision 81.0.0.0
+            - کد اشتراک تازهٔ AV81؛ کدهای ۸۰ معتبر نیستند.
+            - برنامه آفلاین‌اول؛ بررسی به‌روزرسانی از GitHub Pages.
+            - قبل از اجرا، هش را با `SHA256SUMS-81.0.0.0` بررسی کنید.
+            - APK در CI با گواهی debug امضا شده است؛ برای ارتقای درجا از ۸۰،
+              گواهی باید همان گواهی ۸۰ باشد (رجوع به docs/SECURITY-fa.md).

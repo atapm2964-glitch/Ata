@@ -1,0 +1,13 @@
+{
+  "app": "AtaVision",
+  "version": "81.0.0.0",
+  "channel": "stable",
+  "minSupported": "80.0.0.0",
+  "notesFa": "نسخهٔ ۸۱: کد اشتراک تازهٔ AV81؛ کدهای ۸۰ معتبر نیستند. برنامه آفلاین‌اول می‌ماند.",
+  "downloads": {
+    "html": "AtaVision-81.0.0.0-Offline.html",
+    "android": "AtaVision-81.0.0.0-Android.apk",
+    "windowsPortable": "AtaVision-81.0.0.0-Windows-Portable-x64.exe",
+    "windowsSetup": "AtaVision-81.0.0.0-Windows-Setup-x64.exe"
+  }
+}
